@@ -1,0 +1,14 @@
+[package]
+name = "adelie"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-only"
+description = "Game Boy emulator"
+repository = "https://github.com/SnowyMouse/adelie"
+rust-version = "1.79.0"
+
+[dependencies]
+
+[features]
+default = ["alloc"]
+alloc = []
