@@ -69,13 +69,11 @@ impl<Cart: Cartridge> Emulator<Cart> {
 }
 
 #[derive(Copy, Clone, Default)]
-struct StubbedInterface;
-impl Memory for StubbedInterface {
+struct StubbedInterface<const STATIC_VALUE: u8>;
+impl<const STATIC_VALUE: u8> Memory for StubbedInterface<STATIC_VALUE> {
     fn read(&mut self, _address: u16) -> u8 {
-        0xFF
+        STATIC_VALUE
     }
 
-    fn write(&mut self, _address: u16, _data: u8) {
-
-    }
+    fn write(&mut self, _address: u16, _data: u8) {}
 }

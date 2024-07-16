@@ -54,28 +54,28 @@ pub trait Memory {
 #[derive(Copy, Clone)]
 pub struct VideoRAM {
     pub(crate) memory: [u8; 0x4000],
-    pub(crate) bank: ByteSize<1>
+    pub(crate) bank: WritableByte<1>
 }
 
 impl VideoRAM {
-    fn resolve_address(&self, addr: u16) -> usize {
+    fn resolve_address_to_byte(&mut self, addr: u16) -> &mut u8 {
         let offset = (addr & 0x1FFF) as usize;
-        let bank_offset = (self.bank.size & 1) << 13; // * 0x2000
-        bank_offset | offset
+        let bank_offset = ((self.bank.byte as usize) & 1) << 13; // * 0x2000
+        &mut self.memory[bank_offset | offset]
     }
 }
 
 impl Memory for VideoRAM {
     fn read(&mut self, address: u16) -> u8 {
-        self.memory[self.resolve_address(address)]
+        *self.resolve_address_to_byte(address)
     }
 
     fn write(&mut self, address: u16, data: u8) {
-        self.memory[self.resolve_address(address)] = data
+        *self.resolve_address_to_byte(address) = data
     }
 
     fn get_bank(&self) -> Option<usize> {
-        Some(self.bank.size)
+        Some(self.bank.byte as usize)
     }
 
     fn get_memory(&self) -> Option<&[u8]> {
@@ -91,7 +91,7 @@ impl Default for VideoRAM {
     fn default() -> Self {
         Self {
             memory: [0u8; 0x4000],
-            bank: ByteSize { size: 0 }
+            bank: WritableByte { byte: 0 }
         }
     }
 }
@@ -100,40 +100,40 @@ impl Default for VideoRAM {
 #[derive(Copy, Clone)]
 pub struct WorkRAM {
     memory: [u8; 32768],
-    bank: ByteSize<7>
+    pub(crate) bank: WritableByte<7>
 }
 
 impl WorkRAM {
-    fn resolve_address(&self, addr: u16) -> usize {
+    fn resolve_address_to_byte(&mut self, addr: u16) -> &mut u8 {
         // Only care about the lower 12 bits.
         let offset = (addr & 0xFFF) as usize;
 
         // If the upper bit is not set, we are accessing 0xC000-0xCFFF or 0xE000-0xEFFF.
         let bank_offset = if (addr & 0x1000) == 0 {
             // 0xC000-0xCFFF = bank 0
-            0
+            0usize
         }
         // Otherwise, we are accessing 0xD000-0xDFFF or 0xF000-0xFDFF.
         else {
             // 0xD000-0xDFFF = bank n
-            (self.bank.size & 7) << 12 // * 0x1000
+            ((self.bank.byte as usize) & 7) << 12 // * 0x1000
         };
 
-        bank_offset | offset
+        &mut self.memory[bank_offset | offset]
     }
 }
 
 impl Memory for WorkRAM {
     fn read(&mut self, address: u16) -> u8 {
-        self.memory[self.resolve_address(address)]
+        *self.resolve_address_to_byte(address)
     }
 
     fn write(&mut self, address: u16, data: u8) {
-        self.memory[self.resolve_address(address)] = data
+        *self.resolve_address_to_byte(address) = data
     }
 
     fn get_bank(&self) -> Option<usize> {
-        Some(self.bank.size)
+        Some(self.bank.byte as usize)
     }
 
     fn get_memory(&self) -> Option<&[u8]> {
@@ -149,7 +149,7 @@ impl Default for WorkRAM {
     fn default() -> Self {
         Self {
             memory: [0u8; 32768],
-            bank: ByteSize { size: 1 }
+            bank: WritableByte { byte: 1 }
         }
     }
 }
@@ -162,19 +162,19 @@ pub struct OAM {
 
 impl OAM {
     #[inline(always)]
-    fn resolve_address(&self, address: u16) -> usize {
+    fn resolve_address_to_byte(&mut self, address: u16) -> &mut u8 {
         debug_assert!(address >= 0xFE00 && address <= 0xFE9F, "address {address:#04X} is not in OAM");
-        (address & 0xFF) as usize
+        &mut self.memory[(address & 0xFF) as usize]
     }
 }
 
 impl Memory for OAM {
     fn read(&mut self, address: u16) -> u8 {
-        self.memory[self.resolve_address(address)]
+        *self.resolve_address_to_byte(address)
     }
 
     fn write(&mut self, address: u16, data: u8) {
-        self.memory[self.resolve_address(address)] = data
+        *self.resolve_address_to_byte(address) = data
     }
 
     fn get_memory(&self) -> Option<&[u8]> {
@@ -201,18 +201,18 @@ pub struct HighRAM {
 }
 impl HighRAM {
     #[inline(always)]
-    fn resolve_address(&self, address: u16) -> usize {
+    fn resolve_address_to_byte(&mut self, address: u16) -> &mut u8 {
         debug_assert!(address >= 0xFF80 && address < 0xFFFF, "address {address:#04X} is not in HRAM");
-        (address & 0x7F) as usize
+        &mut self.memory[(address & 0x7F) as usize]
     }
 }
 impl Memory for HighRAM {
     fn read(&mut self, address: u16) -> u8 {
-        self.memory[self.resolve_address(address)]
+        *self.resolve_address_to_byte(address)
     }
 
     fn write(&mut self, address: u16, data: u8) {
-        self.memory[self.resolve_address(address)] = data
+        *self.resolve_address_to_byte(address) = data
     }
 
     fn get_memory(&self) -> Option<&[u8]> {
@@ -314,18 +314,18 @@ impl Memory for BootROM {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 #[repr(transparent)]
-pub(crate) struct ByteSize<const MASK: usize> {
-    pub size: usize
+pub(crate) struct WritableByte<const MASK: u8> {
+    pub byte: u8
 }
 
-impl<const MASK: usize> Memory for ByteSize<MASK> {
+impl<const MASK: u8> Memory for WritableByte<MASK> {
     fn read(&mut self, _address: u16) -> u8 {
-        self.size as u8
+        self.byte
     }
 
     fn write(&mut self, _address: u16, data: u8) {
-        self.size = (data as usize) & MASK
+        self.byte = data & MASK
     }
 }
