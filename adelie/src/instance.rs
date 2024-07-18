@@ -1,4 +1,4 @@
-mod io;
+pub(crate) mod io;
 
 use crate::cartridge::Cartridge;
 use crate::instance::io::{IO, IORegisters};
@@ -69,7 +69,7 @@ impl<Cart: Cartridge> Emulator<Cart> {
 }
 
 #[derive(Copy, Clone, Default)]
-struct StubbedInterface<const STATIC_VALUE: u8>;
+pub struct StubbedInterface<const STATIC_VALUE: u8>;
 impl<const STATIC_VALUE: u8> Memory for StubbedInterface<STATIC_VALUE> {
     fn read(&mut self, _address: u16) -> u8 {
         STATIC_VALUE

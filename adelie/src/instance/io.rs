@@ -35,18 +35,19 @@ pub struct IORegisters {
     pub unused: StubbedInterface<0xFF>
 }
 
-const CARTRIDGE_ROM_START: u16 = 0x0000;
-const CARTRIDGE_ROM_END: u16 = 0x7FFF;
-const VRAM_START: u16 = 0x8000;
-const VRAM_END: u16 = 0x9FFF;
-const CARTRIDGE_RAM_START: u16 = 0xA000;
-const CARTRIDGE_RAM_END: u16 = 0xBFFF;
-const WRAM_START: u16 = 0xC000;
-const WRAM_END: u16 = 0xFDFF;
-const OAM_START: u16 = 0xFE00;
-const OAM_END: u16 = 0xFE9F;
-const HRAM_START: u16 = 0xFF80;
-const HRAM_END: u16 = 0xFFFE;
+pub(crate) const CARTRIDGE_ROM_START: u16 = 0x0000;
+pub(crate) const CARTRIDGE_ROM_MAIN_BANK_END: u16 = 0x3FFF;
+pub(crate) const CARTRIDGE_ROM_END: u16 = 0x7FFF;
+pub(crate) const VRAM_START: u16 = 0x8000;
+pub(crate) const VRAM_END: u16 = 0x9FFF;
+pub(crate) const CARTRIDGE_RAM_START: u16 = 0xA000;
+pub(crate) const CARTRIDGE_RAM_END: u16 = 0xBFFF;
+pub(crate) const WRAM_START: u16 = 0xC000;
+pub(crate) const WRAM_END: u16 = 0xFDFF;
+pub(crate) const OAM_START: u16 = 0xFE00;
+pub(crate) const OAM_END: u16 = 0xFE9F;
+pub(crate) const HRAM_START: u16 = 0xFF80;
+pub(crate) const HRAM_END: u16 = 0xFFFE;
 
 impl<Cart: Cartridge> IO<Cart> {
     fn resolve_address_to_device(&mut self, address: u16) -> &mut dyn Memory {
