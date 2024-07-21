@@ -1,7 +1,7 @@
-use crate::cartridge::{Cartridge, MapperType};
+use crate::cartridge::{InstantCartridge, MapperType};
 use crate::cartridge::mbc::{MBCResult, TYPICAL_RAM_BANK_SIZE, typical_ram_offset, TYPICAL_ROM_BANK_SIZE, typical_rom_offset, validate};
 use crate::instance::io::CARTRIDGE_ROM_END;
-use crate::memory::Memory;
+use crate::memory::InstantMemory;
 
 pub struct MBC5<'a> {
     rom: &'a [u8],
@@ -35,7 +35,7 @@ impl MBC5<'_> {
     }
 }
 
-impl Memory for MBC5<'_> {
+impl InstantMemory for MBC5<'_> {
     fn read(&mut self, address: u16) -> u8 {
         if address <= CARTRIDGE_ROM_END {
             self.rom[typical_rom_offset(address, self.rom_bank)]
@@ -92,7 +92,7 @@ impl Memory for MBC5<'_> {
     }
 }
 
-impl Cartridge for MBC5<'_> {
+impl InstantCartridge for MBC5<'_> {
     fn rom_bank_size(&self) -> Option<usize> {
         Some(TYPICAL_ROM_BANK_SIZE)
     }

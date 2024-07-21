@@ -1,7 +1,7 @@
-use crate::cartridge::{Cartridge, MapperType};
+use crate::cartridge::{InstantCartridge, MapperType};
 use crate::cartridge::mbc::{CartridgeLoadError, MBCResult, TYPICAL_RAM_BANK_SIZE, typical_ram_offset, TYPICAL_ROM_BANK_SIZE, typical_rom_offset, validate};
 use crate::instance::io::CARTRIDGE_ROM_END;
-use crate::memory::Memory;
+use crate::memory::InstantMemory;
 
 pub struct MBC3<'a> {
     rom: &'a [u8],
@@ -55,7 +55,7 @@ impl MBC3<'_> {
     }
 }
 
-impl Memory for MBC3<'_> {
+impl InstantMemory for MBC3<'_> {
     fn read(&mut self, address: u16) -> u8 {
         if address <= CARTRIDGE_ROM_END {
             self.rom[typical_rom_offset(address, self.rom_bank)]
@@ -90,7 +90,7 @@ impl Memory for MBC3<'_> {
         }
         else if address <= 0x5FFF {
             if self.rtc.is_none() {
-                // TODO: Determine if this register is still modified even on non-RTC MBC3s
+                // TODO: Determine if RTC registers can still be accessed.
                 if data < 4 {
                     self.ram_mode = MBC3RAMMode::RAMBank(data as usize);
                 }
@@ -142,7 +142,7 @@ enum MBC3RAMMode {
 
 
 
-impl Cartridge for MBC3<'_> {
+impl InstantCartridge for MBC3<'_> {
     fn rom_bank_size(&self) -> Option<usize> {
         Some(TYPICAL_ROM_BANK_SIZE)
     }

@@ -1,10 +1,10 @@
 pub mod mbc;
 
 use core::fmt::{Display, Formatter};
-use crate::memory::Memory;
+use crate::memory::InstantMemory;
 
-/// Denotes a cartridge, which contains the game.
-pub trait Cartridge: Memory {
+/// Denotes an emulated cartridge.
+pub trait InstantCartridge: InstantMemory {
     /// Return true if the cart reset line is set.
     fn reset(&self) -> bool {
         false
@@ -12,40 +12,35 @@ pub trait Cartridge: Memory {
 
     /// Get the size of a bank in ROM.
     ///
-    /// This is useful for RAM viewers, but this method can return `None` if data cannot be accessed
-    /// directly (e.g. an external cartridge).
+    /// This is useful for RAM viewers, but it is not required to implement this..
     fn rom_bank_size(&self) -> Option<usize> {
         None
     }
 
     /// Get a reference to the ROM data.
     ///
-    /// This is useful for RAM viewers, but this method can return `None` if data cannot be accessed
-    /// directly (e.g. an external cartridge).
+    /// This is useful for RAM viewers, but it is not required to implement this.
     fn rom_data(&self) -> Option<&[u8]> {
         None
     }
 
     /// Get the size of a bank in RAM.
     ///
-    /// This is useful for RAM viewers, but this method can return `None` if data cannot be accessed
-    /// directly (e.g. an external cartridge).
+    /// This is useful for RAM viewers, but it is not required to implement this.
     fn ram_bank_size(&self) -> Option<usize> {
         None
     }
 
     /// Get a reference to the RAM data.
     ///
-    /// This is useful for RAM viewers, but this method can return `None` if data cannot be accessed
-    /// directly (e.g. an external cartridge).
+    /// This is useful for RAM viewers, but it is not required to implement this.
     fn ram_data(&self) -> Option<&[u8]> {
         None
     }
 
     /// Get a mutable reference to the RAM data.
     ///
-    /// This is useful for RAM viewers, but this method can return `None` if data cannot be accessed
-    /// directly (e.g. an external cartridge).
+    /// This is useful for RAM viewers, but it is not required to implement this.
     fn ram_data_mut(&mut self) -> Option<&mut [u8]> {
         None
     }
@@ -54,8 +49,8 @@ pub trait Cartridge: Memory {
 /// Denotes the state a cartridge is not present.
 #[derive(Copy, Clone)]
 pub struct NullCartridge;
-impl Cartridge for NullCartridge {}
-impl Memory for NullCartridge {
+impl InstantCartridge for NullCartridge {}
+impl InstantMemory for NullCartridge {
     fn read(&mut self, _address: u16) -> u8 {
         0xFF
     }
@@ -63,7 +58,7 @@ impl Memory for NullCartridge {
 }
 
 #[cfg(feature = "alloc")]
-impl Cartridge for alloc::boxed::Box<dyn Cartridge> {
+impl InstantCartridge for alloc::boxed::Box<dyn InstantCartridge> {
     fn reset(&self) -> bool {
         self.as_ref().reset()
     }
@@ -85,7 +80,7 @@ impl Cartridge for alloc::boxed::Box<dyn Cartridge> {
 }
 
 #[cfg(feature = "alloc")]
-impl Memory for alloc::boxed::Box<dyn Cartridge> {
+impl InstantMemory for alloc::boxed::Box<dyn InstantCartridge> {
     fn read(&mut self, address: u16) -> u8 {
         self.as_mut().read(address)
     }

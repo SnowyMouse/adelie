@@ -1,7 +1,7 @@
-use crate::cartridge::{Cartridge, MapperType};
+use crate::cartridge::{InstantCartridge, MapperType};
 use crate::cartridge::mbc::{MBCResult, typical_ram_offset, validate};
 use crate::instance::io::{CARTRIDGE_ROM_MAIN_BANK_END, CARTRIDGE_ROM_END};
-use crate::memory::Memory;
+use crate::memory::InstantMemory;
 
 pub struct NoROM<'a> {
     rom: &'a [u8],
@@ -15,7 +15,7 @@ impl NoROM<'_> {
     }
 }
 
-impl Memory for NoROM<'_> {
+impl InstantMemory for NoROM<'_> {
     fn read(&mut self, address: u16) -> u8 {
         if address <= CARTRIDGE_ROM_END {
             self.rom[address as usize]
@@ -38,7 +38,7 @@ impl Memory for NoROM<'_> {
     }
 }
 
-impl Cartridge for NoROM<'_> {
+impl InstantCartridge for NoROM<'_> {
     fn rom_data(&self) -> Option<&[u8]> {
         Some(self.rom)
     }

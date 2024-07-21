@@ -1,32 +1,30 @@
-use crate::cartridge::Cartridge;
 use crate::instance::{Model, SOC_BASE_CLOCK_SPEED, StubbedInterface};
-use crate::memory::{BootROM, WritableByte, HighRAM, Memory, NullMemory, OAM, VideoRAM, WorkRAM};
+use crate::memory::{BootROM, WritableByte, HighRAM, InstantMemory, NullMemory, OAM, VideoRAM, WorkRAM, Memory, BufferedInstantMemory};
 
 #[derive(Copy, Clone)]
-pub struct IO<Cart: Cartridge> {
+pub struct IO<Cart: Memory> {
     pub cartridge: Cart,
-    pub boot_rom: BootROM,
+    pub boot_rom: BufferedInstantMemory<BootROM>,
     pub registers: IORegisters,
-    pub video_ram: VideoRAM,
-    pub work_ram: WorkRAM,
-    pub oam: OAM,
-    pub high_ram: HighRAM,
-    pub io_data: IORegisters,
+    pub video_ram: BufferedInstantMemory<VideoRAM>,
+    pub work_ram: BufferedInstantMemory<WorkRAM>,
+    pub oam: BufferedInstantMemory<OAM>,
+    pub high_ram: BufferedInstantMemory<HighRAM>,
     pub no_access: NullMemory,
     pub model: Model
 }
 
 #[derive(Copy, Clone, Default)]
 pub struct IORegisters {
-    pub joypad_data: JoypadData,
+    pub joypad_data: BufferedInstantMemory<JoypadData>,
     pub serial_transfer: StubbedInterface<0x00>,
-    pub timer_div: TimerDIV,
-    pub interrupts: Interrupts,
+    pub timer_div: BufferedInstantMemory<TimerDIV>,
+    pub interrupts: BufferedInstantMemory<Interrupts>,
     pub audio: StubbedInterface<0x00>,
     pub wave_pattern: StubbedInterface<0x00>,
-    pub lcd: LCDData,
-    pub oam_dma: OAMDMA,
-    pub disable_bootrom: DisableBootROM,
+    pub lcd: BufferedInstantMemory<LCDData>,
+    pub oam_dma: BufferedInstantMemory<OAMDMA>,
+    pub disable_bootrom: BufferedInstantMemory<DisableBootROM>,
     pub vram_dma: StubbedInterface<0x00>,
     pub bg_obj_palettes: StubbedInterface<0x00>,
     pub prepare_speed_switch: StubbedInterface<0x00>,
@@ -49,11 +47,11 @@ pub(crate) const OAM_END: u16 = 0xFE9F;
 pub(crate) const HRAM_START: u16 = 0xFF80;
 pub(crate) const HRAM_END: u16 = 0xFFFE;
 
-impl<Cart: Cartridge> IO<Cart> {
+impl<Cart: Memory> IO<Cart> {
     fn resolve_address_to_device(&mut self, address: u16) -> &mut dyn Memory {
         // Redirect to /dev/null if OAM DMA in progress
         let is_cgb = self.model.is_cgb();
-        if self.io_data.oam_dma.in_progress {
+        if self.registers.oam_dma.memory.in_progress {
             if (HRAM_START..=HRAM_END).contains(&address) {
                 return &mut self.high_ram;
             }
@@ -65,7 +63,7 @@ impl<Cart: Cartridge> IO<Cart> {
 
         match address {
             CARTRIDGE_ROM_START..=CARTRIDGE_ROM_END => {
-                if (self.io_data.disable_bootrom.byte[0] != 0) && (address < 0x100 || (address >= 0x300 && self.model.is_cgb())) {
+                if (self.registers.disable_bootrom.memory.byte[0] != 0) && (address < 0x100 || (address >= 0x300 && self.model.is_cgb())) {
                     &mut self.boot_rom
                 }
                 else {
@@ -108,24 +106,14 @@ impl<Cart: Cartridge> IO<Cart> {
 
                 // CGB only
                 0x4D        => &mut self.registers.prepare_speed_switch,
-                0x4F        => &mut self.video_ram.bank,
+                0x4F        => &mut self.video_ram.memory.bank,
                 0x51..=0x55 => &mut self.registers.vram_dma,
                 0x56        => &mut self.registers.infrared,
                 0x68..=0x6B => &mut self.registers.bg_obj_palettes,
                 0x6C        => &mut self.registers.object_priority,
-                0x70        => &mut self.work_ram.bank,
+                0x70        => &mut self.work_ram.memory.bank,
             }
         }
-    }
-}
-
-impl<Cart: Cartridge> Memory for IO<Cart> {
-    fn read(&mut self, address: u16) -> u8 {
-        self.resolve_address_to_device(address).read(address)
-    }
-
-    fn write(&mut self, address: u16, data: u8) {
-        self.resolve_address_to_device(address).write(address, data)
     }
 }
 
@@ -154,7 +142,7 @@ impl LCDData {
     }
 }
 
-impl Memory for LCDData {
+impl InstantMemory for LCDData {
     fn read(&mut self, address: u16) -> u8 {
         *self.resolve_address_to_byte(address)
     }
@@ -170,7 +158,7 @@ pub struct OAMDMA {
     in_progress: bool
 }
 
-impl Memory for OAMDMA {
+impl InstantMemory for OAMDMA {
     fn read(&mut self, _address: u16) -> u8 {
         (self.address >> 8) as u8
     }
@@ -195,7 +183,7 @@ pub struct JoypadData {
     pub right: bool,
 }
 
-impl Memory for JoypadData {
+impl InstantMemory for JoypadData {
     fn read(&mut self, _address: u16) -> u8 {
         let mut result = 0b1111;
 
@@ -234,7 +222,7 @@ impl Default for DisableBootROM {
     }
 }
 
-impl Memory for DisableBootROM {
+impl InstantMemory for DisableBootROM {
     fn read(&mut self, _address: u16) -> u8 {
         self.byte[0]
     }
@@ -305,7 +293,7 @@ impl Default for TimerDIV {
         Self { value: [0,0,0,0] }
     }
 }
-impl Memory for TimerDIV {
+impl InstantMemory for TimerDIV {
     fn read(&mut self, address: u16) -> u8 {
         match address & 3 {
             0 => *self.get_div(),           // DIV
@@ -352,7 +340,7 @@ impl Interrupts {
     }
 }
 
-impl Memory for Interrupts {
+impl InstantMemory for Interrupts {
     fn read(&mut self, address: u16) -> u8 {
         *self.resolve_address_to_byte(address)
     }

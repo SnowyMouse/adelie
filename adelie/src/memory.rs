@@ -1,13 +1,47 @@
 //! Memory controller functionality.
 
-/// Trait for memory controllers.
+/// Trait for any memory controller.
 pub trait Memory {
+    /// Set the data lines.
+    fn set_data_lines(&mut self, address: u16, write: bool, data_in: u8);
+
+    /// Read the data output from the device.
+    fn read_out(&mut self) -> u8;
+}
+
+/// Wrapper for accessing an InstantMemory as Memory.
+#[derive(Copy, Clone, Default)]
+pub struct BufferedInstantMemory<T: InstantMemory> {
+    pub(crate) memory: T,
+    address: u16
+}
+impl<T: InstantMemory> BufferedInstantMemory<T> {
+    pub fn new(memory: T) -> Self {
+        Self { memory, address: 0 }
+    }
+}
+impl<T: InstantMemory> Memory for BufferedInstantMemory<T> {
+    fn set_data_lines(&mut self, address: u16, write: bool, data_in: u8) {
+        self.address = address;
+        if write {
+            self.memory.write(address, data_in)
+        }
+    }
+
+    fn read_out(&mut self) -> u8 {
+        self.memory.read(self.address)
+    }
+}
+
+
+/// Trait for emulated memory controllers.
+pub trait InstantMemory {
     /// Read a byte at the given address.
     ///
     /// In some cases, the act of reading something can impact the state of the object (also known
     /// as side effects), so this is a mutable function even if it involves reading.
     ///
-    /// To read data with no side effects, use [`get_memory`](Memory::get_memory).
+    /// To read data with no side effects, use [`get_memory`](InstantMemory::get_memory).
     ///
     /// Note that this function is infallible and must return something, even if it is garbage.
     fn read(&mut self, address: u16) -> u8;
@@ -16,7 +50,7 @@ pub trait Memory {
     ///
     /// Note that, for some memory objects, the act of writing can have side effects.
     ///
-    /// To write data with no side effects, use [`get_memory_mut`](Memory::get_memory_mut).
+    /// To write data with no side effects, use [`get_memory_mut`](InstantMemory::get_memory_mut).
     fn write(&mut self, address: u16, data: u8);
 
     /// Get the current bank.
@@ -30,8 +64,7 @@ pub trait Memory {
     ///
     /// Returns `None` if not implemented.
     ///
-    /// Depending on how this is implemented, this function might not be available. For example, if
-    /// the memory is external (e.g. physical), this may not be available.
+    /// Depending on how this is implemented, this function might not be available.
     fn get_memory(&self) -> Option<&[u8]> {
         None
     }
@@ -40,11 +73,10 @@ pub trait Memory {
     ///
     /// Returns `None` if not implemented.
     ///
-    /// Depending on how this is implemented, this function might not be available. For example, if
-    /// the memory is external (e.g. physical), this may not be available.
+    /// Depending on how this is implemented, this function might not be available.
     ///
     /// It is also possible for an object to be read-only. In which case,
-    /// [`get_memory`](Memory::get_memory) would return `Some`, but this function wouldn't.
+    /// [`get_memory`](InstantMemory::get_memory) would return `Some`, but this function wouldn't.
     fn get_memory_mut(&mut self) -> Option<&mut [u8]> {
         None
     }
@@ -65,7 +97,7 @@ impl VideoRAM {
     }
 }
 
-impl Memory for VideoRAM {
+impl InstantMemory for VideoRAM {
     fn read(&mut self, address: u16) -> u8 {
         *self.resolve_address_to_byte(address)
     }
@@ -123,7 +155,7 @@ impl WorkRAM {
     }
 }
 
-impl Memory for WorkRAM {
+impl InstantMemory for WorkRAM {
     fn read(&mut self, address: u16) -> u8 {
         *self.resolve_address_to_byte(address)
     }
@@ -168,7 +200,7 @@ impl OAM {
     }
 }
 
-impl Memory for OAM {
+impl InstantMemory for OAM {
     fn read(&mut self, address: u16) -> u8 {
         *self.resolve_address_to_byte(address)
     }
@@ -206,7 +238,7 @@ impl HighRAM {
         &mut self.memory[(address & 0x7F) as usize]
     }
 }
-impl Memory for HighRAM {
+impl InstantMemory for HighRAM {
     fn read(&mut self, address: u16) -> u8 {
         *self.resolve_address_to_byte(address)
     }
@@ -235,11 +267,11 @@ impl Default for HighRAM {
 #[derive(Copy, Clone, Default)]
 pub struct NullMemory;
 impl Memory for NullMemory {
-    fn read(&mut self, _address: u16) -> u8 {
-        0x00
-    }
+    fn set_data_lines(&mut self, _address: u16, _write: bool, _data_in: u8) {}
 
-    fn write(&mut self, _address: u16, _data: u8) {}
+    fn read_out(&mut self) -> u8 {
+        0xFF
+    }
 }
 
 const BOOT_ROM_LOW_SIZE: usize = 256;
@@ -286,7 +318,7 @@ impl Default for BootROM {
     }
 }
 
-impl Memory for BootROM {
+impl InstantMemory for BootROM {
     fn read(&mut self, address: u16) -> u8 {
         let address = address as usize;
         let (low, high) = self.data.split_at(BOOT_ROM_LOW_SIZE);
@@ -321,11 +353,13 @@ pub(crate) struct WritableByte<const MASK: u8> {
 }
 
 impl<const MASK: u8> Memory for WritableByte<MASK> {
-    fn read(&mut self, _address: u16) -> u8 {
-        self.byte
+    fn set_data_lines(&mut self, _address: u16, write: bool, data_in: u8) {
+        if write {
+            self.byte = data_in
+        }
     }
 
-    fn write(&mut self, _address: u16, data: u8) {
-        self.byte = data & MASK
+    fn read_out(&mut self) -> u8 {
+        self.byte
     }
 }
