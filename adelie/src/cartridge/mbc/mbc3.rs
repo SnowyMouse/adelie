@@ -1,4 +1,4 @@
-use crate::cartridge::{InstantCartridge, MapperType};
+use crate::cartridge::{DebugCartridge, MapperType};
 use crate::cartridge::mbc::{CartridgeLoadError, MBCResult, TYPICAL_RAM_BANK_SIZE, typical_ram_offset, TYPICAL_ROM_BANK_SIZE, typical_rom_offset, validate};
 use crate::instance::io::CARTRIDGE_ROM_END;
 use crate::memory::InstantMemory;
@@ -142,20 +142,38 @@ enum MBC3RAMMode {
 
 
 
-impl InstantCartridge for MBC3<'_> {
+impl DebugCartridge for MBC3<'_> {
     fn rom_bank_size(&self) -> Option<usize> {
         Some(TYPICAL_ROM_BANK_SIZE)
     }
+
+    fn rom_bank(&self) -> Option<usize> {
+        Some(self.rom_bank)
+    }
+
     fn rom_data(&self) -> Option<&[u8]> {
         Some(self.rom)
     }
     fn ram_bank_size(&self) -> Option<usize> {
         Some(TYPICAL_RAM_BANK_SIZE)
     }
+
+    fn ram_bank(&self) -> Option<usize> {
+        if self.ram.is_empty() {
+            None
+        }
+        else if let MBC3RAMMode::RAMBank(n) = self.ram_mode {
+            Some(n)
+        }
+        else {
+            None
+        }
+    }
+
     fn ram_data(&self) -> Option<&[u8]> {
-        Some(self.ram)
+        return_ram_if_present!(self)
     }
     fn ram_data_mut(&mut self) -> Option<&mut [u8]> {
-        Some(self.ram)
+        return_ram_if_present!(self)
     }
 }

@@ -1,8 +1,9 @@
+use crate::cartridge::Cartridge;
 use crate::instance::{Model, SOC_BASE_CLOCK_SPEED, StubbedInterface};
 use crate::memory::{BootROM, WritableByte, HighRAM, InstantMemory, NullMemory, OAM, VideoRAM, WorkRAM, Memory, BufferedInstantMemory};
 
 #[derive(Copy, Clone)]
-pub struct IO<Cart: Memory> {
+pub struct IO<Cart: Cartridge> {
     pub cartridge: Cart,
     pub boot_rom: BufferedInstantMemory<BootROM>,
     pub registers: IORegisters,
@@ -47,7 +48,7 @@ pub(crate) const OAM_END: u16 = 0xFE9F;
 pub(crate) const HRAM_START: u16 = 0xFF80;
 pub(crate) const HRAM_END: u16 = 0xFFFE;
 
-impl<Cart: Memory> IO<Cart> {
+impl<Cart: Cartridge> IO<Cart> {
     fn resolve_address_to_device(&mut self, address: u16) -> &mut dyn Memory {
         // Redirect to /dev/null if OAM DMA in progress
         let is_cgb = self.model.is_cgb();

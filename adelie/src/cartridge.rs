@@ -1,55 +1,91 @@
 pub mod mbc;
 
 use core::fmt::{Display, Formatter};
-use crate::memory::InstantMemory;
+use crate::memory::{InstantMemory, Memory};
+
+/// Denotes a cartridge that can be used with the emulator.
+pub trait Cartridge: Memory {
+    /// Return true if the cart reset line is set.
+    fn reset_line_set(&self) -> bool {
+        false
+    }
+}
 
 /// Denotes an emulated cartridge.
-pub trait InstantCartridge: InstantMemory {
+pub trait DebugCartridge: InstantMemory {
     /// Return true if the cart reset line is set.
-    fn reset(&self) -> bool {
+    fn reset_line_set(&self) -> bool {
         false
     }
 
     /// Get the size of a bank in ROM.
     ///
-    /// This is useful for RAM viewers, but it is not required to implement this..
-    fn rom_bank_size(&self) -> Option<usize> {
-        None
-    }
+    /// Returns `None` if no ROM is present or ROM is not bankable.
+    fn rom_bank_size(&self) -> Option<usize>;
+
+    /// Get the current ROM bank.
+    ///
+    /// Returns `None` if no ROM is present or ROM is not bankable.
+    fn rom_bank(&self) -> Option<usize>;
 
     /// Get a reference to the ROM data.
     ///
-    /// This is useful for RAM viewers, but it is not required to implement this.
-    fn rom_data(&self) -> Option<&[u8]> {
-        None
-    }
+    /// Returns `None` if no ROM is present.
+    fn rom_data(&self) -> Option<&[u8]>;
 
     /// Get the size of a bank in RAM.
     ///
-    /// This is useful for RAM viewers, but it is not required to implement this.
-    fn ram_bank_size(&self) -> Option<usize> {
-        None
-    }
+    /// Returns `None` if no RAM is present or RAM is not bankable.
+    fn ram_bank_size(&self) -> Option<usize>;
+
+    /// Get the current RAM bank.
+    ///
+    /// Returns `None` if no RAM is present or RAM is not bankable.
+    fn ram_bank(&self) -> Option<usize>;
 
     /// Get a reference to the RAM data.
     ///
-    /// This is useful for RAM viewers, but it is not required to implement this.
-    fn ram_data(&self) -> Option<&[u8]> {
-        None
-    }
+    /// Returns `None` if no RAM is present.
+    fn ram_data(&self) -> Option<&[u8]>;
 
     /// Get a mutable reference to the RAM data.
     ///
-    /// This is useful for RAM viewers, but it is not required to implement this.
-    fn ram_data_mut(&mut self) -> Option<&mut [u8]> {
-        None
-    }
+    /// Returns `None` if no RAM is present.
+    fn ram_data_mut(&mut self) -> Option<&mut [u8]>;
 }
 
 /// Denotes the state a cartridge is not present.
 #[derive(Copy, Clone)]
 pub struct NullCartridge;
-impl InstantCartridge for NullCartridge {}
+impl DebugCartridge for NullCartridge {
+    fn rom_bank_size(&self) -> Option<usize> {
+        None
+    }
+
+    fn rom_bank(&self) -> Option<usize> {
+        None
+    }
+
+    fn rom_data(&self) -> Option<&[u8]> {
+        None
+    }
+
+    fn ram_bank_size(&self) -> Option<usize> {
+        None
+    }
+
+    fn ram_bank(&self) -> Option<usize> {
+        None
+    }
+
+    fn ram_data(&self) -> Option<&[u8]> {
+        None
+    }
+
+    fn ram_data_mut(&mut self) -> Option<&mut [u8]> {
+        None
+    }
+}
 impl InstantMemory for NullCartridge {
     fn read(&mut self, _address: u16) -> u8 {
         0xFF
@@ -58,29 +94,38 @@ impl InstantMemory for NullCartridge {
 }
 
 #[cfg(feature = "alloc")]
-impl InstantCartridge for alloc::boxed::Box<dyn InstantCartridge> {
-    fn reset(&self) -> bool {
-        self.as_ref().reset()
-    }
+impl DebugCartridge for alloc::boxed::Box<dyn DebugCartridge> {
     fn rom_bank_size(&self) -> Option<usize> {
         self.as_ref().rom_bank_size()
     }
+
+    fn rom_bank(&self) -> Option<usize> {
+        self.as_ref().rom_bank()
+    }
+
     fn rom_data(&self) -> Option<&[u8]> {
         self.as_ref().rom_data()
     }
+
     fn ram_bank_size(&self) -> Option<usize> {
         self.as_ref().ram_bank_size()
     }
+
+    fn ram_bank(&self) -> Option<usize> {
+        self.as_ref().ram_bank()
+    }
+
     fn ram_data(&self) -> Option<&[u8]> {
         self.as_ref().ram_data()
     }
+
     fn ram_data_mut(&mut self) -> Option<&mut [u8]> {
         self.as_mut().ram_data_mut()
     }
 }
 
 #[cfg(feature = "alloc")]
-impl InstantMemory for alloc::boxed::Box<dyn InstantCartridge> {
+impl InstantMemory for alloc::boxed::Box<dyn DebugCartridge> {
     fn read(&mut self, address: u16) -> u8 {
         self.as_mut().read(address)
     }
@@ -279,5 +324,85 @@ impl Display for CartridgeHeaderError {
             Self::UnknownRAMSize(m) => f.write_fmt(format_args!("Unknown RAM size ({m:#02X})")),
             Self::UnknownROMSize(m) => f.write_fmt(format_args!("Unknown ROM size ({m:#02X})")),
         }
+    }
+}
+
+/// Used for wrapping a DebugCartridge with an address bus, thus implementing [`Memory`].
+#[derive(Copy, Clone)]
+pub struct EmulatedCartridge<Cart: DebugCartridge> {
+    cartridge: Cart,
+    address: u16
+}
+impl<Cart: DebugCartridge> EmulatedCartridge<Cart> {
+    pub fn new(cartridge: Cart) -> EmulatedCartridge<Cart> {
+        EmulatedCartridge { cartridge, address: 0 }
+    }
+}
+impl<Cart: DebugCartridge> DebugCartridge for EmulatedCartridge<Cart> {
+    fn rom_bank_size(&self) -> Option<usize> {
+        self.cartridge.rom_bank_size()
+    }
+
+    fn rom_bank(&self) -> Option<usize> {
+        self.cartridge.rom_bank()
+    }
+
+    fn rom_data(&self) -> Option<&[u8]> {
+        self.cartridge.rom_data()
+    }
+
+    fn ram_bank_size(&self) -> Option<usize> {
+        self.cartridge.ram_bank_size()
+    }
+
+    fn ram_bank(&self) -> Option<usize> {
+        self.cartridge.ram_bank()
+    }
+
+    fn ram_data(&self) -> Option<&[u8]> {
+        self.cartridge.ram_data()
+    }
+
+    fn ram_data_mut(&mut self) -> Option<&mut [u8]> {
+        self.cartridge.ram_data_mut()
+    }
+}
+
+impl<C: DebugCartridge> InstantMemory for EmulatedCartridge<C> {
+    fn read(&mut self, address: u16) -> u8 {
+        self.cartridge.read(address)
+    }
+
+    fn write(&mut self, address: u16, data: u8) {
+        self.cartridge.write(address, data)
+    }
+
+    fn get_bank(&self) -> Option<usize> {
+        self.cartridge.get_bank()
+    }
+
+    fn get_memory(&self) -> Option<&[u8]> {
+        self.cartridge.get_memory()
+    }
+
+    fn get_memory_mut(&mut self) -> Option<&mut [u8]> {
+        self.cartridge.get_memory_mut()
+    }
+}
+impl<C: DebugCartridge> Memory for EmulatedCartridge<C> {
+    fn set_data_lines(&mut self, address: u16, write: bool, data_in: u8) {
+        self.address = address;
+        if write {
+            self.cartridge.write(address, data_in)
+        }
+    }
+
+    fn read_out(&mut self) -> u8 {
+        self.cartridge.read(self.address)
+    }
+}
+impl<C: DebugCartridge> Cartridge for EmulatedCartridge<C> {
+    fn reset_line_set(&self) -> bool {
+        self.cartridge.reset_line_set()
     }
 }

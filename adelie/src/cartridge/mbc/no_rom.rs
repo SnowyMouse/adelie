@@ -1,4 +1,4 @@
-use crate::cartridge::{InstantCartridge, MapperType};
+use crate::cartridge::{DebugCartridge, MapperType};
 use crate::cartridge::mbc::{MBCResult, typical_ram_offset, validate};
 use crate::instance::io::{CARTRIDGE_ROM_MAIN_BANK_END, CARTRIDGE_ROM_END};
 use crate::memory::InstantMemory;
@@ -38,14 +38,31 @@ impl InstantMemory for NoROM<'_> {
     }
 }
 
-impl InstantCartridge for NoROM<'_> {
+impl DebugCartridge for NoROM<'_> {
+    fn rom_bank_size(&self) -> Option<usize> {
+        None
+    }
+
+    fn rom_bank(&self) -> Option<usize> {
+        None
+    }
+
     fn rom_data(&self) -> Option<&[u8]> {
         Some(self.rom)
     }
+
+    fn ram_bank_size(&self) -> Option<usize> {
+        None
+    }
+
+    fn ram_bank(&self) -> Option<usize> {
+        None
+    }
+
     fn ram_data(&self) -> Option<&[u8]> {
-        Some(self.ram)
+        return_ram_if_present!(self)
     }
     fn ram_data_mut(&mut self) -> Option<&mut [u8]> {
-        Some(self.ram)
+        return_ram_if_present!(self)
     }
 }

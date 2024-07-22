@@ -1,3 +1,15 @@
+
+macro_rules! return_ram_if_present {
+    ($self:expr) => {
+        if $self.ram.is_empty() {
+            None
+        }
+        else {
+            Some($self.ram)
+        }
+    };
+}
+
 pub mod no_rom;
 pub mod mbc2;
 pub mod mbc3;

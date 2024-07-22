@@ -1,3 +1,4 @@
+use crate::cartridge::Cartridge;
 use crate::instance::io::{IO, IORegisters};
 use crate::memory::{BootROM, BufferedInstantMemory, InstantMemory, Memory, NullMemory};
 
@@ -24,14 +25,14 @@ impl Model {
 }
 
 #[derive(Copy, Clone)]
-pub struct Emulator<Cart: Memory> {
+pub struct Emulator<Cart: Cartridge> {
     soc_clock: u32,
     io: IO<Cart>
 }
 
 const SOC_BASE_CLOCK_SPEED: u32 = 1024 * 1024 * 4;
 
-impl<Cart: Memory> Emulator<Cart> {
+impl<Cart: Cartridge> Emulator<Cart> {
     pub fn new(
         cartridge: Cart,
         boot_rom: BootROM,
