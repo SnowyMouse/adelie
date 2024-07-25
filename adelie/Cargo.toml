@@ -11,5 +11,6 @@ rust-version = "1.79.0"
 [dependencies]
 
 [features]
-default = ["alloc"]
+default = ["alloc", "std"]
 alloc = []
+std = ["alloc"]

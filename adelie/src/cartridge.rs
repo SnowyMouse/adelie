@@ -6,9 +6,10 @@ use crate::memory::{InstantMemory, Memory};
 /// Denotes a cartridge that can be used with the emulator.
 pub trait Cartridge: Memory {
     /// Return true if the cart reset line is set.
-    fn reset_line_set(&self) -> bool {
-        false
-    }
+    fn reset_line_set(&self) -> bool;
+
+    /// Set the CLK signal.
+    fn set_clk(&mut self, high: bool);
 }
 
 /// Denotes an emulated cartridge.
@@ -405,4 +406,5 @@ impl<C: DebugCartridge> Cartridge for EmulatedCartridge<C> {
     fn reset_line_set(&self) -> bool {
         self.cartridge.reset_line_set()
     }
+    fn set_clk(&mut self, _high: bool) {}
 }

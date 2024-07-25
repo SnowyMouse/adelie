@@ -12,7 +12,8 @@ pub struct IO<Cart: Cartridge> {
     pub oam: BufferedInstantMemory<OAM>,
     pub high_ram: BufferedInstantMemory<HighRAM>,
     pub no_access: NullMemory,
-    pub model: Model
+    pub model: Model,
+    pub double_speed_mode: bool,
 }
 
 #[derive(Copy, Clone, Default)]
