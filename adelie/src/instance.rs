@@ -25,8 +25,8 @@ impl Model {
 }
 
 #[derive(Copy, Clone)]
-pub struct Emulator<Cart: Cartridge, U: Sized> {
-    user_data: U,
+pub struct Emulator<Cart: Cartridge, Callbacks: EmulatorCallbacks<Cart>> {
+    callbacks: Callbacks,
     soc_clock_high: bool,
     soc_clock: u32,
     io: IO<Cart>,
@@ -40,15 +40,15 @@ pub struct Emulator<Cart: Cartridge, U: Sized> {
 const SOC_BASE_CLOCK_SPEED: u32 = 1024 * 1024 * 4;
 const SOC_BASE_CLOCK_SPEED_DOUBLE_SPEED: u32 = SOC_BASE_CLOCK_SPEED *2;
 
-impl<Cart: Cartridge, U: Sized> Emulator<Cart, U> {
+impl<Cart: Cartridge, Callbacks: EmulatorCallbacks<Cart>> Emulator<Cart, Callbacks> {
     pub fn new(
-        user_data: U,
+        callbacks: Callbacks,
         cartridge: Cart,
         boot_rom: BootROM,
         model: Model
     ) -> Self {
         Self {
-            user_data,
+            callbacks,
             soc_clock_high: false,
             soc_clock: 0,
             io: IO {
@@ -68,19 +68,9 @@ impl<Cart: Cartridge, U: Sized> Emulator<Cart, U> {
         }
     }
 
-    /// Get the user data.
-    pub fn get_user_data(&self) -> &U {
-        &self.user_data
-    }
-
-    /// Get a mutable reference to the user data.
-    pub fn get_user_data_mut(&mut self) -> &mut U {
-        &mut self.user_data
-    }
-
-    /// Destroy the instance to get the user data back.
-    pub fn into_user_data(self) -> U {
-        self.user_data
+    /// Destroy the instance to get the callbacks object back.
+    pub fn into_callbacks_object(self) -> Callbacks {
+        self.callbacks
     }
 
     /// Run half of one SoC clock cycle.
@@ -206,6 +196,61 @@ impl<Cart: Cartridge, U: Sized> Emulator<Cart, U> {
         self.tick_soc(!self.soc_clock_high);
         true
     }
+}
+
+#[derive(Copy, Clone, Default, PartialEq, Debug)]
+pub struct Color {
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8
+}
+
+/// Callbacks that get called when certain events in the emulator occur.
+///
+/// By default, each callback is a no-op.
+pub trait EmulatorCallbacks<Cart: Cartridge>: Sized {
+    /// Called upon generating an audio sample, giving you the combined samples for each audio channel
+    /// as well as each individual audio channel.
+    ///
+    /// This will be called at 2 MiHz.
+    fn on_sample(
+        &mut self,
+        emulator: &Emulator<Cart, Self>,
+        sample: &APUSamples
+    ) {}
+
+    /// Called upon entering vblank.
+    fn on_vblank(
+        &mut self,
+        emulator: &Emulator<Cart, Self>
+    ) {}
+
+    /// Called upon generating a pixel.
+    fn on_dot(
+        &mut self,
+        emulator: &Emulator<Cart, Self>,
+        dot: Color
+    ) {}
+}
+
+/// No-op implementation if no callbacks are desired.
+impl<Cart: Cartridge> EmulatorCallbacks<Cart> for () {}
+
+/// Defines an audio sample on left/right channels.
+#[derive(Copy, Clone, PartialEq, Default, Debug)]
+pub struct AudioSample {
+    pub left: u16,
+    pub right: u16
+}
+
+/// Defines an audio sample for all channels.
+#[derive(Copy, Clone, PartialEq, Default, Debug)]
+pub struct APUSamples {
+    pub mixed: AudioSample,
+    pub wave1: AudioSample,
+    pub wave2: AudioSample,
+    pub sample: AudioSample,
+    pub noise: AudioSample,
 }
 
 pub enum InstantMemoryType {
